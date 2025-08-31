@@ -16,7 +16,7 @@ class AppLocalizations {
   static const Map<String, Map<String, String>> _localizedValues = {
     'en': {
       'appTitle': 'Eco Watch',
-      'coastalPeople': 'Coastal People',
+      'coastalPeople': 'Community People',
       'ngosGovernment': 'NGOs & Government',
       'researchersStudents': 'Researchers/Students',
       'login': 'Login',
@@ -119,7 +119,14 @@ class AppLocalizations {
       'exportData': 'Export Data',
       'creditsEarned': 'Credits Earned',
       'badges': 'Badges',
-      'funding': 'Funding'
+      'funding': 'Funding',
+      // Add these to your ARB files
+      "signupSuccess": "Account created successfully. Please verify your email.",
+      "verifyEmail": "Login Successfully",
+      "userNotFound": "No account found with this email.",
+      "wrongPassword": "Incorrect password.",
+      "invalidEmail": "Invalid email address.",
+      "resetEmailSent": "Password reset email sent."
     },
     'hi': {
       'appTitle': 'ईको वॉच',
@@ -556,6 +563,12 @@ class AppLocalizations {
   String get creditsEarned => translate('creditsEarned');
   String get badges => translate('badges');
   String get funding => translate('funding');
+  String get signupSuccess => translate('signupSuccess');
+  String get verifyEmail => translate('verifyEmail');
+  String get userNotFound => translate('userNotFound');
+  String get wrongPassword => translate('wrongPassword');
+  String get invalidEmail => translate('invalidEmail');
+  String get resetEmailSent => translate('resetEmailSent');
 
   get type => null;
 }

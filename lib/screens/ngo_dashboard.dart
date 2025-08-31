@@ -1,721 +1,340 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
 
-class NgoDashboard extends StatefulWidget {
-  const NgoDashboard({super.key});
-
-  @override
-  _NgoDashboardState createState() => _NgoDashboardState();
+void main() {
+  runApp(const NGODashboardApp());
 }
 
-class _NgoDashboardState extends State<NgoDashboard> {
-  int _selectedIndex = 0;
+class NGODashboardApp extends StatelessWidget {
+  const NGODashboardApp({super.key});
 
-  static final List<Widget> _widgetOptions = <Widget>[
-    const ComplaintsScreen(),
-    const MapScreen(),
-    const AnalyticsScreen(),
-    const ProfileScreen(),
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        debugShowCheckedModeBanner: false,
+      title: 'Mangrove Protection Dashboard',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        fontFamily: 'Roboto',
+        textTheme: const TextTheme(
+          headlineSmall: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,   
+            color: Colors.black54,
+          ),
+        ),
+      ),
+      home: const NGODashboard(),
+    );
+  }
+}
+
+class Report {
+  final String id;
+  final String type;
+  final DateTime date;
+  final String location;
+  final String severity;
+  String status;
+  final String description;
+
+  Report({
+    required this.id,
+    required this.type,
+    required this.date,
+    required this.location,
+    required this.severity,
+    required this.status,
+    required this.description,
+  });
+}
+
+class NGODashboard extends StatefulWidget {
+  const NGODashboard({super.key});
+
+  @override
+  State<NGODashboard> createState() => _NGODashboardState();
+}
+
+class _NGODashboardState extends State<NGODashboard> {
+  List<Report> allReports = [
+    Report(
+      id: '#12345',
+      type: 'Illegal Cutting',
+      date: DateTime(2023, 10, 15),
+      location: 'Coastal Area A',
+      severity: 'High',
+      status: 'Reported',
+      description: 'Large-scale illegal mangrove cutting observed',
+    ),
+    Report(
+      id: '#12346',
+      type: 'Dumping',
+      date: DateTime(2023, 10, 14),
+      location: 'Coastal Area B',
+      severity: 'Medium',
+      status: 'Reported',
+      description: 'Waste dumping in mangrove area',
+    ),
+    Report(
+      id: '#12347',
+      type: 'Pollution',
+      date: DateTime(2023, 10, 13),
+      location: 'Coastal Area C',
+      severity: 'Low',
+      status: 'Reported',
+      description: 'Oil spill detected in mangrove waters',
+    ),
   ];
 
-  void _onItemTapped(int index) {
+  void _updateStatus(String id, String newStatus) {
     setState(() {
-      _selectedIndex = index;
+      for (var report in allReports) {
+        if (report.id == id) {
+          report.status = newStatus;
+          break;
+        }
+      }
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context)?.ngoDashboard ?? 'NGO Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              _showFilterDialog(context);
-            },
-          ),
-        ],
-      ),
-      body: _widgetOptions.elementAt(_selectedIndex),
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.list),
-            label: AppLocalizations.of(context)?.complaints ?? 'Complaints',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.map),
-            label: AppLocalizations.of(context)?.map ?? 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.analytics),
-            label: AppLocalizations.of(context)?.analytics ?? 'Analytics',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person),
-            label: AppLocalizations.of(context)?.profile ?? 'Profile',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-      ),
-    );
-  }
-
-  void _showFilterDialog(BuildContext context) {
+  void _showStatusDialog(Report report) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return const FilterDialog();
+        String? selectedStatus = report.status;
+        
+        return AlertDialog(
+          title: Text('Update Status for ${report.id}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Type: ${report.type}'),
+                Text('Location: ${report.location}'),
+                const SizedBox(height: 16),
+                const Text('Select new status:'),
+                const SizedBox(height: 8),
+                DropdownButton<String>(
+                  value: selectedStatus,
+                  onChanged: (String? newValue) {
+                    selectedStatus = newValue;
+                  },
+                  items: <String>['Reported', 'Pending', 'Verified', 'Resolved']
+                      .map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (selectedStatus != null) {
+                  _updateStatus(report.id, selectedStatus!);
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        );
       },
     );
   }
-}
 
-// Complaints Screen
-class ComplaintsScreen extends StatelessWidget {
-  const ComplaintsScreen({super.key});
+  Widget _buildReportCard(Report report) {
+    Color severityColor;
+    switch (report.severity) {
+      case 'High':
+        severityColor = Colors.red;
+        break;
+      case 'Medium':
+        severityColor = Colors.orange;
+        break;
+      case 'Low':
+        severityColor = Colors.green;
+        break;
+      default:
+        severityColor = Colors.grey;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    // Sample complaints data
-    final complaints = [
-      {
-        'id': '#12345',
-        'date': '2023-10-15',
-        'type': 'Illegal Cutting',
-        'status': 'Pending',
-        'severity': 'High',
-        'location': 'Coastal Area A',
-        'description': 'Large-scale mangrove cutting observed',
-      },
-      {
-        'id': '#12346',
-        'date': '2023-10-14',
-        'type': 'Dumping',
-        'status': 'Verified',
-        'severity': 'Medium',
-        'location': 'Coastal Area B',
-        'description': 'Industrial waste dumping in mangrove area',
-      },
-      {
-        'id': '#12347',
-        'date': '2023-10-13',
-        'type': 'Pollution',
-        'status': 'Resolved',
-        'severity': 'Low',
-        'location': 'Coastal Area C',
-        'description': 'Oil spill detected in northern mangrove zone',
-      },
-    ];
+    Color statusColor;
+    switch (report.status) {
+      case 'Reported':
+        statusColor = Colors.blue;
+        break;
+      case 'Pending':
+        statusColor = Colors.orange;
+        break;
+      case 'Verified':
+        statusColor = Colors.purple;
+        break;
+      case 'Resolved':
+        statusColor = Colors.green;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
 
-    return ListView.builder(
-      itemCount: complaints.length,
-      itemBuilder: (context, index) {
-        final complaint = complaints[index];
-        return ComplaintCard(complaint: complaint);
-      },
-    );
-  }
-}
-
-// Complaint Card Widget
-class ComplaintCard extends StatelessWidget {
-  final Map<String, dynamic> complaint;
-
-  const ComplaintCard({super.key, required this.complaint});
-
-  @override
-  Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 3,
       child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          color: Colors.grey[200],
-          child: const Icon(Icons.photo, size: 30),
-        ),
-        title: Text(complaint['type']!),
-        subtitle: Column(
+        contentPadding: const EdgeInsets.all(16),
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ID: ${complaint['id']!} • ${complaint['date']!}'),
-            Text('Location: ${complaint['location']!}'),
-            Text('Severity: ${complaint['severity']!}'),
-          ],
-        ),
-        trailing: Chip(
-          label: Text(
-            complaint['status']!,
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: _getStatusColor(complaint['status']!),
-        ),
-        onTap: () {
-          _showComplaintDetails(context, complaint);
-        },
-      ),
-    );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Pending': return Colors.orange;
-      case 'Verified': return Colors.blue;
-      case 'Resolved': return Colors.green;
-      default: return Colors.grey;
-    }
-  }
-
-  void _showComplaintDetails(BuildContext context, Map<String, dynamic> complaint) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return ComplaintDetailsDialog(complaint: complaint);
-      },
-    );
-  }
-}
-
-// Map Screen with Hotspot Visualization
-class MapScreen extends StatelessWidget {
-  const MapScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            AppLocalizations.of(context)?.hotspotMap ?? 'Hotspot Map',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-        ),
-        Expanded(
-          child: Stack(
-            children: [
-              // Placeholder for map
-              Container(
-                color: Colors.grey[200],
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.map, size: 50, color: Colors.blue),
-                      const SizedBox(height: 16),
-                      Text(
-                        AppLocalizations.of(context)?.redZones ?? 'Red Zones',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Interactive heat map showing complaint density'),
-                    ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  report.type,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              // Hotspot overlay indicators
-              Positioned(
-                top: 100,
-                left: 50,
-                child: _buildHotspot(Colors.red, 'High Density'),
-              ),
-              Positioned(
-                top: 200,
-                right: 70,
-                child: _buildHotspot(Colors.orange, 'Medium'),
-              ),
-              Positioned(
-                bottom: 150,
-                left: 120,
-                child: _buildHotspot(Colors.yellow, 'Low'),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildLegendItem(Colors.red, 'High Priority'),
-              _buildLegendItem(Colors.orange, 'Medium Priority'),
-              _buildLegendItem(Colors.yellow, 'Low Priority'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHotspot(Color color, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.6),
-            shape: BoxShape.circle,
-            border: Border.all(color: color, width: 2),
-          ),
-        ),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-
-  Widget _buildLegendItem(Color color, String text) {
-    return Row(
-      children: [
-        Container(
-          width: 16,
-          height: 16,
-          color: color,
-        ),
-        const SizedBox(width: 8),
-        Text(text),
-      ],
-    );
-  }
-}
-
-// Analytics Screen
-class AnalyticsScreen extends StatelessWidget {
-  const AnalyticsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppLocalizations.of(context)?.complaintTrends ?? 'Complaint Trends',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 20),
-          
-          // Statistics Cards
-          Row(
-            children: [
-              _buildStatCard('Total Complaints', '142', Colors.blue),
-              _buildStatCard('Resolved', '89', Colors.green),
-              _buildStatCard('Pending', '53', Colors.orange),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // Chart Placeholder
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.bar_chart, size: 40, color: Colors.blue),
-                  const SizedBox(height: 8),
-                  Text(AppLocalizations.of(context)?.complaintTrends ?? 'Complaint Trends'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Export Button
-          ElevatedButton.icon(
-            onPressed: () {
-            },
-            icon: const Icon(Icons.download),
-            label: Text(AppLocalizations.of(context)?.exportData ?? 'Export Data'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Profile Screen with Badges & Credits
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          const CircleAvatar(
-            radius: 40,
-            backgroundColor: Colors.blue,
-            child: Icon(Icons.account_balance, size: 40, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Forest Department',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          Text(
-            'ID: GOV123456',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          
-          // Credits Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    AppLocalizations.of(context)?.creditsEarned ?? 'Credits Earned',
-                    style: Theme.of(context).textTheme.titleMedium,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '1,250',
+                  child: Text(
+                    report.status,
                     style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
+                      color: statusColor,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                    },
-                    child: Text(AppLocalizations.of(context)?.funding ?? 'Funding'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Badges Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    AppLocalizations.of(context)?.badges ?? 'Badges',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildBadge(Icons.emoji_events, 'Gold', Colors.amber),
-                      _buildBadge(Icons.emoji_events, 'Silver', Colors.grey),
-                      _buildBadge(Icons.emoji_events, 'Bronze', Colors.brown),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadge(IconData icon, String label, Color color) {
-    return Column(
-      children: [
-        Icon(icon, size: 40, color: color),
-        const SizedBox(height: 8),
-        Text(label),
-      ],
-    );
-  }
-}
-
-// Filter Dialog
-class FilterDialog extends StatefulWidget {
-  const FilterDialog({super.key});
-
-  @override
-  _FilterDialogState createState() => _FilterDialogState();
-}
-
-class _FilterDialogState extends State<FilterDialog> {
-  String? _selectedStatus;
-  String? _selectedSeverity;
-  String? _selectedType;
-  String? _selectedLocation;
-
-  final List<String> _statusOptions = ['Pending', 'Verified', 'Resolved'];
-  final List<String> _severityOptions = ['Low', 'Medium', 'High'];
-  final List<String> _typeOptions = ['Illegal Cutting', 'Dumping', 'Pollution', 'Other'];
-  final List<String> _locationOptions = ['Coastal Area A', 'Coastal Area B', 'Coastal Area C'];
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppLocalizations.of(context)?.filter ?? 'Filter',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            
-            // Status Filter
-            DropdownButtonFormField<String>(
-              value: _selectedStatus,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.status ?? 'Status',
-              ),
-              items: _statusOptions.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedStatus = newValue;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Severity Filter
-            DropdownButtonFormField<String>(
-              value: _selectedSeverity,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.severity ?? 'Severity',
-              ),
-              items: _severityOptions.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedSeverity = newValue;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Type Filter
-            DropdownButtonFormField<String>(
-              value: _selectedType,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.type ?? 'Type',
-              ),
-              items: _typeOptions.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedType = newValue;
-              });
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Location Filter
-            DropdownButtonFormField<String>(
-              value: _selectedLocation,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.location ?? 'Location',
-              ),
-              items: _locationOptions.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedLocation = newValue;
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-            
+            const SizedBox(height: 8),
+            Text('ID: ${report.id} - ${report.date.year}-${report.date.month.toString().padLeft(2, '0')}-${report.date.day.toString().padLeft(2, '0')}'),
+            const SizedBox(height: 4),
+            Text('Location: ${report.location}'),
+            const SizedBox(height: 4),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedStatus = null;
-                        _selectedSeverity = null;
-                        _selectedType = null;
-                        _selectedLocation = null;
-                      });
-                    },
-                    child: Text(AppLocalizations.of(context)?.clearAll ?? 'Clear All'),
+                const Text('Severity: '),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: severityColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: severityColor),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Text(AppLocalizations.of(context)?.applyFilters ?? 'Apply Filters'),
+                  child: Text(
+                    report.severity,
+                    style: TextStyle(
+                      color: severityColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(
+              report.description,
+              style: const TextStyle(fontStyle: FontStyle.italic),
+            ),
           ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit, color: Colors.blue),
+          onPressed: () => _showStatusDialog(report),
         ),
       ),
     );
   }
-}
-
-// Complaint Details Dialog
-class ComplaintDetailsDialog extends StatefulWidget {
-  final Map<String, dynamic> complaint;
-
-  const ComplaintDetailsDialog({super.key, required this.complaint});
-
-  @override
-  _ComplaintDetailsDialogState createState() => _ComplaintDetailsDialogState();
-}
-
-class _ComplaintDetailsDialogState extends State<ComplaintDetailsDialog> {
-  final _notesController = TextEditingController();
-  String? _selectedStatus;
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Filter reports by status
+    final reportedReports = allReports.where((report) => report.status == 'Reported').toList();
+    final pendingReports = allReports.where((report) => report.status == 'Pending').toList();
+    final verifiedReports = allReports.where((report) => report.status == 'Verified').toList();
+    final resolvedReports = allReports.where((report) => report.status == 'Resolved').toList();
+
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Mangrove Protection Dashboard'),
+          centerTitle: true,
+          backgroundColor: const Color(0xFF2E7D32),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'All Reports'),
+              Tab(text: 'Pending'),
+              Tab(text: 'Verified'),
+              Tab(text: 'Resolved'),
+            ],
+            indicatorColor: Colors.white,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: TabBarView(
           children: [
-            Text(
-              'Complaint Details',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            
-            Container(
-              height: 150,
-              color: Colors.grey[200],
-              child: const Icon(Icons.photo, size: 50),
-            ),
-            const SizedBox(height: 16),
-            
-            Text('Type: ${widget.complaint['type']!}'),
-            Text('Severity: ${widget.complaint['severity']!}'),
-            Text('Location: ${widget.complaint['location']!}'),
-            Text('Date: ${widget.complaint['date']!}'),
-            const SizedBox(height: 16),
-            
-            Text('Description: ${widget.complaint['description']!}'),
-            const SizedBox(height: 16),
-            
-            // Status Update
-            DropdownButtonFormField<String>(
-              value: _selectedStatus ?? widget.complaint['status'],
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.updateStatus ?? 'Update Status',
-              ),
-              items: ['Pending', 'Verified', 'Resolved'].map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedStatus = newValue;
-                });
+            // All Reports Tab
+            ListView.builder(
+              itemCount: allReports.length,
+              itemBuilder: (context, index) {
+                return _buildReportCard(allReports[index]);
               },
             ),
-            const SizedBox(height: 16),
             
-            // Notes
-            TextFormField(
-              controller: _notesController,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)?.addNotes ?? 'Add Notes',
-                border: const OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
+            // Pending Tab
+            pendingReports.isEmpty
+                ? const Center(child: Text('No pending reports'))
+                : ListView.builder(
+                    itemCount: pendingReports.length,
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(pendingReports[index]);
+                    },
+                  ),
             
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
+            // Verified Tab
+            verifiedReports.isEmpty
+                ? const Center(child: Text('No verified reports'))
+                : ListView.builder(
+                    itemCount: verifiedReports.length,
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(verifiedReports[index]);
                     },
-                    child: const Text('Cancel'),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
+            
+            // Resolved Tab
+            resolvedReports.isEmpty
+                ? const Center(child: Text('No resolved reports'))
+                : ListView.builder(
+                    itemCount: resolvedReports.length,
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(resolvedReports[index]);
                     },
-                    child: const Text('Save Changes'),
                   ),
-                ),
-              ],
-            ),
           ],
         ),
       ),

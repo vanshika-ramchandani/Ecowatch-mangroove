@@ -1,535 +1,769 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart'; // ← ADD THIS IMPORT
+import 'package:geolocator/geolocator.dart';
+import 'firestore_services.dart'; // ← ADD THIS IMPORT
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const EcoWatchApp());
+}
+
+class EcoWatchApp extends StatelessWidget {
+  const EcoWatchApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Eco Watch',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        fontFamily: 'Poppins',
+        textTheme: const TextTheme(
+          headlineMedium: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+          titleLarge: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2E7D32),
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+      ),
+      home: const CitizenDashboard(),
+    );
+  }
+}
 
 class CitizenDashboard extends StatefulWidget {
   const CitizenDashboard({super.key});
 
   @override
-  _CitizenDashboardState createState() => _CitizenDashboardState();
+  State<CitizenDashboard> createState() => _CitizenDashboardState();
 }
 
 class _CitizenDashboardState extends State<CitizenDashboard> {
-  int _selectedIndex = 0;
-
-  static final List<Widget> _widgetOptions = <Widget>[
-    const ComplaintScreen(),
-    const HistoryScreen(),
-    const ProfileScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+  final FirestoreService _firestoreService = FirestoreService();
+  Map<String, dynamic> _dashboardStats = {};
+  bool _isLoading = true;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context).citizenDashboard),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-            },
-          ),
-        ],
-      ),
-      body: _widgetOptions.elementAt(_selectedIndex),
-      floatingActionButton: _selectedIndex == 0 
-          ? FloatingActionButton(
-              onPressed: () {
-                _showComplaintDialog(context);
-              },
-              tooltip: AppLocalizations.of(context).raiseComplaint,
-              child: const Icon(Icons.add),
-            )
-          : null,
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home),
-            label: AppLocalizations.of(context).home,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.history),
-            label: AppLocalizations.of(context).history,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person),
-            label: AppLocalizations.of(context).profile,
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-      ),
-    );
+  void initState() {
+    super.initState();
+    _loadDashboardData();
   }
 
-  void _showComplaintDialog(BuildContext context) {
+  Future<void> _loadDashboardData() async {
+    try {
+      final stats = await _firestoreService.getDashboardStats();
+      setState(() {
+        _dashboardStats = stats;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading dashboard data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showReportIssueDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return ComplaintDialog();
+        return ReportIssueDialog(
+          firestoreService: _firestoreService,
+          onReportSubmitted: _loadDashboardData,
+        );
       },
     );
   }
-}
-
-class ComplaintScreen extends StatelessWidget {
-  const ComplaintScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppLocalizations.of(context).welcome,
-            style: Theme.of(context).textTheme.headlineSmall, // Changed from headline5
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9F5),
+      appBar: AppBar(
+        title: const Text(
+          'Eco Watch',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
-          const SizedBox(height: 8),
-          Text(
-            AppLocalizations.of(context).dashboardSummary,
-            style: Theme.of(context).textTheme.bodyMedium, // Changed from bodyText2
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF2E7D32),
+        elevation: 4,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(16),
           ),
-          const SizedBox(height: 24),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).yourBadge,
-                        style: Theme.of(context).textTheme.titleMedium, // Changed from subtitle1
-                      ),
-                      const Icon(Icons.emoji_events, color: Colors.amber),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: 0.4,
-                    backgroundColor: Colors.grey.shade300,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '2 of 5 for Bronze',
-                    style: Theme.of(context).textTheme.bodySmall, // Changed from caption
-                  ),
-                ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: GestureDetector(
+              onTap: () {
+                // Navigate to profile page
+              },
+              child: const CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  color: Color(0xFF2E7D32),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          GridView.count(
-            shrinkWrap: true,
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Welcome Section
+            _buildWelcomeSection(context),
+            
+            const SizedBox(height: 24),
+            
+            // Badge Progress Section
+            _buildBadgeProgressSection(context),
+            
+            const SizedBox(height: 24),
+            
+            // Statistics Grid
+            _buildStatisticsGrid(context),
+            
+            const SizedBox(height: 24),
+            
+            // Report Issue Button
+            _buildReportButton(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeSection(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestoreService.getUserStream(),
+      builder: (context, snapshot) {
+        String userName = 'User';
+        if (snapshot.hasData && snapshot.data!.exists) {
+          var userData = snapshot.data!.data() as Map<String, dynamic>;
+          userName = userData['name'] ?? 'User';
+        }
+
+        return SingleChildScrollView(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 2,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome, $userName!',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Help protect mangroves by reporting issues and tracking your impact.',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBadgeProgressSection(BuildContext context) {
+    final progress = _dashboardStats['badgeProgress'] ?? 0;
+    final target = _dashboardStats['badgeTarget'] ?? 5;
+    final currentBadge = _dashboardStats['currentBadge'] ?? 'Bronze';
+
+    return SingleChildScrollView(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 2,
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your Badge Progress',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            
+            // Current Badge
+            Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCD7F32).withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFCD7F32),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.eco,
+                    color: Color(0xFFCD7F32),
+                    size: 30,
+                  ),
+                ),
+                
+                const SizedBox(width: 16),
+                
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$currentBadge Eco Protector',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$progress of $target reports for $currentBadge',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      LinearProgressIndicator(
+                        value: progress / target,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFCD7F32)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatisticsGrid(BuildContext context) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: [
+        _buildStatItem(
+          context,
+          Icons.report_problem,
+          'Total Complaints',
+          (_dashboardStats['totalComplaints'] ?? 0).toString(),
+          Colors.redAccent,
+        ),
+        _buildStatItem(
+          context,
+          Icons.verified,
+          'Verified',
+          (_dashboardStats['verifiedComplaints'] ?? 0).toString(),
+          Colors.green,
+        ),
+        _buildStatItem(
+          context,
+          Icons.pending_actions,
+          'Pending',
+          (_dashboardStats['pendingComplaints'] ?? 0).toString(),
+          Colors.orange,
+        ),
+        _buildStatItem(
+          context,
+          Icons.forest,
+          'Trees Planted',
+          (_dashboardStats['treesPlanted'] ?? 0).toString(),
+          Colors.lightGreen,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(BuildContext context, IconData icon, String title, String value, Color color) {
+    return SingleChildScrollView(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildDashboardItem(
-                context,
-                Icons.report_problem,
-                AppLocalizations.of(context).totalComplaints,
-                '12',
-                Colors.redAccent,
+              Icon(icon, size: 40, color: color),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              _buildDashboardItem(
-                context,
-                Icons.verified,
-                AppLocalizations.of(context).verifiedComplaints,
-                '8',
-                Colors.green,
-              ),
-              _buildDashboardItem(
-                context,
-                Icons.pending_actions,
-                AppLocalizations.of(context).pendingComplaints,
-                '3',
-                Colors.orange,
-              ),
-              _buildDashboardItem(
-                context,
-                Icons.forest,
-                AppLocalizations.of(context).treesPlanted,
-                '5',
-                Colors.lightGreen,
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildDashboardItem(BuildContext context, IconData icon, String title, String value, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall, // Changed from headline6
-            ),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall, // Changed from caption
-            ),
-          ],
+  Widget _buildReportButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => _showReportIssueDialog(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2E7D32),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 4,
+        ),
+        child: const Text(
+          'Report Issue',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
       ),
     );
   }
 }
 
-class HistoryScreen extends StatelessWidget {
-  const HistoryScreen({super.key});
+class ReportIssueDialog extends StatefulWidget {
+  final FirestoreService firestoreService;
+  final VoidCallback onReportSubmitted;
+
+  const ReportIssueDialog({
+    super.key,
+    required this.firestoreService,
+    required this.onReportSubmitted,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final complaints = [
-      {
-        'id': '#12345',
-        'date': '2023-10-15',
-        'type': 'Illegal Cutting',
-        'status': 'Verified',
-        'statusColor': Colors.green,
-      },
-      {
-        'id': '#12346',
-        'date': '2023-10-10',
-        'type': 'Dumping',
-        'status': 'Pending',
-        'statusColor': Colors.orange,
-      },
-      {
-        'id': '#12347',
-        'date': '2023-10-05',
-        'type': 'Pollution',
-        'status': 'Resolved',
-        'statusColor': Colors.blue,
-      },
-    ];
-
-    return ListView.builder(
-      itemCount: complaints.length,
-      itemBuilder: (context, index) {
-        final complaint = complaints[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const Icon(Icons.report_problem),
-            title: Text((complaint['type'] as String?) ?? 'Unknown'), // Explicit cast
-            subtitle: Text('ID: ${complaint['id'] as String} • ${complaint['date'] as String}'),
-            trailing: Chip(
-              label: Text(
-                (complaint['status'] as String?) ?? 'Unknown', // Explicit cast
-                style: const TextStyle(color: Colors.white),
-              ),
-              backgroundColor: complaint['statusColor'] as Color,
-            ),
-            onTap: () {
-            },
-          ),
-        );
-      },
-    );
-  }
+  State<ReportIssueDialog> createState() => _ReportIssueDialogState();
 }
 
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+class _ReportIssueDialogState extends State<ReportIssueDialog> {
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _issueTypeController = TextEditingController();
+  File? _image;
+  bool _locationEnabled = false;
+  bool _isSubmitting = false;
+  final ImagePicker _picker = ImagePicker();
+  Position? _currentPosition;
+
+  Future<void> _getImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _image = File(image.path);
+      });
+    }
+  }
+
+  Future<void> _enableLocation() async {
+    try {
+      setState(() {
+        _isSubmitting = true;
+      });
+
+      final position = await widget.firestoreService.getCurrentLocation();
+      
+      setState(() {
+        _locationEnabled = true;
+        _currentPosition = position;
+        _isSubmitting = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Location error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitReport() async {
+    if (_descriptionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add a description'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_issueTypeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please specify the issue type'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!_locationEnabled || _currentPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enable location services'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.firestoreService.submitComplaint(
+        description: _descriptionController.text,
+        issueType: _issueTypeController.text,
+        location: _currentPosition!,
+        imagePath: _image?.path,
+      );
+
+      Navigator.of(context).pop();
+      widget.onReportSubmitted();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report submitted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const user = {
-      'name': 'John Doe',
-      'email': 'john.doe@example.com',
-      'location': 'Mumbai, India',
-      'contact': '+91 9876543210',
-      'badge': 'Bronze',
-    };
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.green.shade100,
-            child: const Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.green,
-            ),
+    return SingleChildScrollView(
+      child: Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        elevation: 8,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
           ),
-          const SizedBox(height: 16),
-          Text(
-            user['name']!,
-            style: Theme.of(context).textTheme.headlineSmall, // Changed from headline6
-          ),
-          Text(
-            user['email']!,
-            style: Theme.of(context).textTheme.bodyMedium, // Changed from bodyText2
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.location_on),
-                    title: const Text('Location'),
-                    subtitle: Text(user['location']!),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.phone),
-                    title: const Text('Contact'),
-                    subtitle: Text(user['contact']!),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.emoji_events),
-                    title: const Text('Current Badge'),
-                    subtitle: Text(user['badge']!),
-                    trailing: Icon(
-                      Icons.verified,
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Report an Issue',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2E7D32),
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              
+              if (!_locationEnabled)
+                _buildLocationEnableSection()
+              else
+                _buildReportFormSection(),
+            ],
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-            },
-            icon: const Icon(Icons.forest),
-            label: const Text('Upload Tree Planting Proof'),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/dashboard');
-            },
-            child: const Text('Logout'),
-          ),
-        ],
+        ),
       ),
     );
   }
-}
 
-class ComplaintDialog extends StatefulWidget {
-  @override
-  _ComplaintDialogState createState() => _ComplaintDialogState();
-}
-
-class _ComplaintDialogState extends State<ComplaintDialog> {
-  String? _selectedIssueType;
-  final _descriptionController = TextEditingController();
-  String? _imagePath;
-
-  final List<String> _issueTypes = [
-    'Illegal Cutting',
-    'Dumping',
-    'Pollution',
-    'Other',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppLocalizations.of(context).raiseComplaint,
-              style: Theme.of(context).textTheme.headlineSmall, // Changed from headline6
+  Widget _buildLocationEnableSection() {
+    return Column(
+      children: [
+        const Icon(
+          Icons.location_on,
+          size: 48,
+          color: Colors.grey,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Enable Location Services',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'To report an issue, we need to know your location to map the problem accurately.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isSubmitting ? null : _enableLocation,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            const SizedBox(height: 16),
-            if (_imagePath == null)
-              GestureDetector(
-                onTap: _showImageSourceDialog,
-                child: Container(
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
+            child: _isSubmitting
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    'Enable Location',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
-                  child: const Icon(
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportFormSection() {
+    return Column(
+      children: [
+        const Icon(
+          Icons.location_on,
+          size: 48,
+          color: Colors.green,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Location Enabled',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Issue Type
+        TextField(
+          controller: _issueTypeController,
+          decoration: InputDecoration(
+            hintText: 'Issue type (e.g., Illegal Cutting, Dumping, Pollution)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Description
+        TextField(
+          controller: _descriptionController,
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: 'Describe the issue in detail...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Image Upload
+        if (_image == null)
+          GestureDetector(
+            onTap: _getImage,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  width: 1,
+                  color: Colors.grey,
+                ),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
                     Icons.camera_alt,
-                    size: 50,
+                    size: 40,
                     color: Colors.grey,
                   ),
-                ),
-              )
-            else
-              Stack(
-                children: [
-                  Image.network(
-                    _imagePath!,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.black54,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, size: 14),
-                        onPressed: () {
-                          setState(() {
-                            _imagePath = null;
-                          });
-                        },
-                      ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Tap to upload an image (optional)',
+                    style: TextStyle(
+                      color: Colors.grey,
                     ),
                   ),
                 ],
               ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedIssueType,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).issueType,
-                border: const OutlineInputBorder(),
-              ),
-              items: _issueTypes
-                  .map((type) => DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(type),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedIssueType = value;
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return AppLocalizations.of(context).issueTypeRequired;
-                }
-                return null;
-              },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).description,
-                border: const OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return AppLocalizations.of(context).descriptionRequired;
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  AppLocalizations.of(context).locationTagging,
-                  style: Theme.of(context).textTheme.bodySmall, // Changed from caption
+          )
+        else
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  _image!,
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Text(AppLocalizations.of(context).cancel),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _image = null;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(AppLocalizations.of(context).complaintSubmitted),
-                        ),
-                      );
-                    },
-                    child: Text(AppLocalizations.of(context).submit),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+        
+        const SizedBox(height: 24),
+        
+        // Submit Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isSubmitting ? null : _submitReport,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ],
+            child: _isSubmitting
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    'Submit Report',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+          ),
         ),
-      ),
+      ],
     );
-  }
-
-  void _showImageSourceDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(AppLocalizations.of(context).chooseImageSource),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _getImageFromCamera();
-              },
-              child: Text(AppLocalizations.of(context).camera),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _getImageFromGallery();
-              },
-              child: Text(AppLocalizations.of(context).gallery),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _getImageFromCamera() async {
-    setState(() {
-      _imagePath = null;
-    });
-  }
-
-  void _getImageFromGallery() async {
-    setState(() {
-      _imagePath = null;
-    });
   }
 }
